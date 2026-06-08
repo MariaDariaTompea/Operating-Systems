@@ -1,0 +1,237 @@
+================================================================================
+          OPERATING SYSTEMS EXAM QUESTIONS (ALPHABETICAL LIST)
+================================================================================
+
+1. Add the necessary C code so that file b.txt is overwritten with the content of file a.txt from the instruction below:
+   execlp("cat", "cat", "a.txt", NULL);
+
+2. Can you create a hard link towards a file on a different partition? Justify your answer.
+
+3. Consider the producer-consumer problem with a buffer of capacity N. How many semaphores would you use to ensure operation correctness and what would be the semaphores' initial values?
+
+4. Consider that function f is executed simultaneously by 10 threads. Add the necessary lines of code to ensure that the value of n is 10 after the threads have completed:
+   int n = 0;
+   void* f(void* p) {
+       n++;
+       return NULL;
+   }
+
+5. Considering that the size of a block is B and the size of an address is A, how many data blocks are addressed by the double indirect addressing of an i-node?
+
+6. Considering that the size of a block is B and the size of an address is A, how many data blocks are addressed by the triple indirect addressing of an inode?
+
+7. Display only the lines of file a.txt that appear only once (not duplicated).
+
+8. Draw the hierarchy of processes created by the code below, including the parent process:
+   for(i=0; i<3; i++) {
+       fork();
+       execlp("ls", "ls", "/", NULL);
+   }
+
+9. Draw the hierarchy of processes created by the code below, including the parent process:
+   for(i=0; i<3; i++) {
+       if(fork() > 0) {
+           wait(0);
+           wait(0);
+           exit(0);
+       }
+   }
+
+10. Explain why the file descriptor returned by popen must be closed with pclose instead of fclose.
+
+11. Give an advantage and a disadvantage of the First Fit placement policy versus the Worst-Fit placing policy.
+
+12. Give an example of distinct values greater than 0 for T, N1, N2, and N3 for which the program below finishes execution:
+    pthread_barrier_t b1, b2;
+    void* f1(void* a) {
+        pthread_barrier_wait(&b1);
+        return NULL;
+    }
+    void* f2(void* a) {
+        pthread_barrier_wait(&b2);
+        return NULL;
+    }
+    int main() {
+        int i;
+        pthread_t t[T][2];
+        pthread_barrier_init(&b1, NULL, N1);
+        pthread_barrier_init(&b2, NULL, N2);
+        for(i=0; i<T; i++) {
+            pthread_create(&t[i][0], NULL, f1, NULL);
+            pthread_create(&t[i][1], NULL, f2, NULL);
+        }
+        for(i=0; i<T; i++) {
+            pthread_join(t[i][0], NULL);
+            pthread_join(t[i][1], NULL);
+        }
+        pthread_barrier_destroy(&b1);
+        pthread_barrier_destroy(&b2);
+        return NULL;
+    }
+
+13. Give five GREP commands that display all the lines in a file that contain letter "a" uppercase or lowercase.
+
+14. Give one advantage and one disadvantage of the set-associative caches versus the direct caches.
+
+15. Give one advantage and one disadvantage of the segmented allocation method over the paged allocation method.
+
+16. Give three function calls that ensure mutual exclusion.
+
+17. Give three regular expressions that match any non-negative number multiple of 5.
+
+18. Give three ways of finding the size of a file on the Linux command line.
+
+19. Give three GREP commands that display the lines of a file which consist exclusively of a non-empty sequence of alternating letters and digits (e.g., a0g or 1r5m).
+
+20. Give a regular expression that matches any even-length sequence of lower-case words separated by spaces, if for each word its length and its position in the sequence are either both odd or both even. The words are counted starting with 1. (Ex: the 5th word must have odd length and the 16th word must have even length).
+
+21. How can you increment the value of a POSIX semaphore?
+
+22. How can you redirect on the command line the standard error through a pipe to another program?
+
+23. How is the address calculation done in the absolute fixed partition-allocation?
+
+24. How many FIFOs can a process open for reading if the FIFOs are and will ever be used by other processes only for writing?
+
+25. How many FIFOs can a process open if they are not and will not ever be used by any other process?
+
+26. How many processes will be created by the code fragment below, excluding the initial parent process?
+    fork(); wait(0); fork(); wait(0); fork();
+
+27. How many threads will you use for processing a million files? Justify your answer.
+
+28. In the program fragment below, mark which process executes each line: the Parent, the Child, or Both.
+    [P|C]
+    [ | ] k = fork();
+    [ | ] if(k == 0) {
+    [ | ]     printf("A\n");
+    [ | ] }
+    [ | ] else {
+    [ | ]     printf("B\n");
+    [ | ] }
+    [ | ] printf("C\n");
+
+29. Schedule the following jobs (given as Name/Duration/Deadline) so that the sum of their delays is minimized:
+    A/5/7, B/2/4, C/4/13, D/3/8
+
+30. Schedule the following jobs (given as Name/Duration/Deadline) so that they all meet their deadlines:
+    A/5/9, B/7/11, C/1/10
+
+31. What are the possible console outputs of the following code fragment (ignore any output that execl might generate), and when will they happen?
+    printf("A\n"); execl(.....); printf("B\n");
+
+32. What could happen if function f were executed by several simultaneous threads? Why?
+    pthread_mutex_t m[2];
+    void* f(void* p) {
+        int id = (int)p;
+        pthread_mutex_t* first = &m[id % 2];
+        pthread_mutex_t* second = &m[(id+1) % 2];
+        pthread_mutex_lock(first);
+        pthread_mutex_lock(second);
+        ...
+        pthread_mutex_unlock(second);
+        pthread_mutex_unlock(first);
+    }
+
+33. What does the system call "read" do when the pipe contains less data than it is required to read, but it is not empty?
+
+34. What does the system call "read" do when the pipe is empty?
+
+35. What does the system call "open" do before returning from opening a FIFO?
+
+36. What is the content of the superblock on a Linux disk?
+
+37. What is the effect of calling pthread_barrier_wait on a barrier initialized with 1?
+
+38. What is the maximum number of child processes, created by the code below, that can coexist simultaneously?
+    for (i = 0; i < 7; i++){
+      if (fork == 0){
+        sleep(rand() % 10);
+        exit(0);
+      }
+      if (i % 3 == 0)
+        wait(0);
+    }
+
+39. What is the most prioritary memory page that the NRU replacement policy chooses as a victim page?
+
+40. What is a "critical section"?
+
+41. What is a binary semaphore, and what is the effect of its P method, when called by multiple concurrent processes/threads?
+
+42. What is the principle of locality regarding pages loading?
+
+43. What happens with the data when you delete a file that has a hard link pointing to it?
+
+44. What state transition will a process undergo when it calls sem_wait and under what conditions? Justify your answer.
+
+45. What state transition will a process undergo when reading from a file?
+
+46. What will the code fragment below print to the console?
+    char *s[3] = {"A", "B", "C"};
+    for (int i = 0; i < 3; i++){
+      execl("/bin/echo", "/bin/echo", s[i], NULL);
+    }
+
+47. What will the fragment below print? Justify your answer.
+    execl("expr", "expr", "1", "+", "1", NULL);
+    execlp("echo", "echo", "3", NULL);
+    printf("4\n");
+
+48. What will the code fragment below print to the console?
+    int p[2];
+    char buf[10];
+    int n;
+    pipe(p);
+    n = read(p[0], buf, 10);
+    printf("%d\n", n);
+
+49. What will be the effect of replacing calls to pthread_mutex_lock with calls to pthread_rwlock_rdlock?
+
+50. What will be the effect of replacing calls to pthread_mutex_lock with calls to sem_post?
+
+51. When would you use execv instead of execl?
+
+52. When would you load into memory the pages of a process that is just starting?
+
+53. When would you prefer using a process instead of a thread?
+
+54. When does a process change state from RUN to READY?
+
+55. Why are zombie processes problematic?
+
+56. Why should the thread recheck the condition after returning from the pthread_cond_wait call?
+
+57. Why is it not advisable to communicate bidirectionally through a single FIFO?
+
+58. What can you do as a software developer to prevent deadlocks?
+
+59. Write an AWK command that displays the sum of the next to last field of all lines.
+
+60. Write an AWK command that displays the sum of all the numbers in a text file whose lines consist of sequences of digits separated by spaces.
+
+61. Write a regular expression that accepts any lines that contain at least three vowels.
+
+62. Write a regular expression that accepts lines that contain "a", but not "b".
+
+63. Write two SED commands that display from a file only the lines that do not contain digit 7.
+
+64. Write two SED commands that display a file's lines deleting the first non-empty sequence of lower-case letters.
+
+65. Write a UNIX Shell command that displays the lines in file a.txt that contain words STARTING with capital letters.
+
+66. Write a UNIX Shell command that inverts in file a.txt all pairs of neighboring digits (ex: a3972b -> a9327b).
+
+67. Write a UNIX Shell command that displays for each line the sum of its numbers, given file a.txt contains on each line two numbers separated by space.
+
+68. Write a UNIX Shell command that displays a list of all unique appearances of IDs belonging to the English or Romanian sections (e.g., amin234, mair5678) that appear in a text file a.txt.
+
+69. Given a directory and all its hierarchy, write a UNIX Shell command that displays all sub-directories containing .c files.
+
+70. Write a UNIX Shell script that calculates the average number of lines of code in all the files with extension ".sh" in the current directory, ignoring comment lines, empty lines, and the lines containing only spaces and tabs.
+
+71. Write a UNIX Shell script that displays all command line arguments without using FOR.
+
+72. Write a UNIX Shell condition that checks whether a file exists and the current user has any permissions on it.
+
+73. Given a UNIX file system configured with a block size of B bytes that can contain A addresses, and i-nodes having D direct links, one simple indirection link, one double indirection link, and one triple indirection link, give the formula for the maximum file size possible.
