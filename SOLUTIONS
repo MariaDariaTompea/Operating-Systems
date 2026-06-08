@@ -1,0 +1,260 @@
+================================================================================
+          OPERATING SYSTEMS EXAM STUDY GUIDE (QUESTIONS & ANSWERS)
+================================================================================
+
+1. Add the necessary C code so that file b.txt is overwritten with the content of file a.txt from the instruction below:
+   execlp("cat", "cat", "a.txt", NULL);
+   -----------------------------------------------------------------------------
+   Answer:
+   You must open 'b.txt' with write permissions, redirect the standard output 
+   stream (file descriptor 1) to point to it using dup2(), and then perform 
+   the execution swap.
+   
+   Code implementation:
+   int fd = open("b.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+   dup2(fd, 1);
+   close(fd);
+   execlp("cat", "cat", "a.txt", NULL);
+
+
+2. Can you create a hard link towards a file on a different partition? Justify your answer.
+   -----------------------------------------------------------------------------
+   Answer:
+   No. A hard link works by mapping a text directory entry directly to a specific 
+   raw i-node number on a physical storage device. Because i-node numbering schemes 
+   are completely local and isolated to their individual disk partitions, crossing 
+   partitions would cause address collision and corruption. To bridge distinct 
+   partitions, a symbolic (soft) link must be used instead.
+
+
+3. Consider the producer-consumer problem with a buffer of capacity N. How many semaphores would you use to ensure operation correctness and what would be the semaphores' initial values?
+   -----------------------------------------------------------------------------
+   Answer:
+   You need to use 3 semaphores to maintain logical data correctness and prevent 
+   concurrent access issues:
+   1. sem_t mutex; (Initialized to 1) -> Provides mutual exclusion to protect access 
+      to the shared buffer array boundaries.
+   2. sem_t empty; (Initialized to N) -> Counts available empty slots; blocks 
+      producers when the buffer fills up.
+   3. sem_t full;  (Initialized to 0) -> Counts available filled items; blocks 
+      consumers when the buffer is empty.
+
+
+4. Consider that function f is executed simultaneously by 10 threads. Add the necessary lines of code to ensure that the value of n is 10 after the threads have completed:
+   int n = 0;
+   void* f(void* p) {
+       n++;
+       return NULL;
+   }
+   -----------------------------------------------------------------------------
+   Answer:
+   The bare shared statement 'n++' causes data corruption via race conditions. 
+   It must be wrapped cleanly using a mutual exclusion lock wrapper.
+   
+   Fixed code implementation:
+   int n = 0;
+   pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+   
+   void* f(void* p) {
+       pthread_mutex_lock(&mtx);
+       n++;
+       pthread_mutex_unlock(&mtx);
+       return NULL;
+   }
+
+
+5. Considering that the size of a block is B and the size of an address is A, how many data blocks are addressed by the double indirect addressing of an i-node?
+   -----------------------------------------------------------------------------
+   Answer:
+   The total number of addressable data blocks is:
+   (B / A)^2 or B^2 / A^2
+   
+   Why? Because a single block can hold (B / A) address pointers. With double 
+   indirection, the first master pointer leads to a block full of pointers, and 
+   each pointer inside that block leads to another block also containing (B / A) 
+   pointers, resulting in a squared mathematical capacity.
+
+
+6. Considering that the size of a block is B and the size of an address is A, how many data blocks are addressed by the triple indirect addressing of an inode?
+   -----------------------------------------------------------------------------
+   Answer:
+   The total number of addressable data blocks is:
+   (B / A)^3 or B^3 / A^3
+   
+   Why? Following the three levels of pointer mapping indirection, each layer 
+   multiplies the address capacity of a single block by itself, yielding a 
+   cubed block density.
+
+
+7. Display only the lines of file a.txt that appear only once (not duplicated).
+   -----------------------------------------------------------------------------
+   Answer:
+   You can use a piped combination of 'sort' and 'uniq' with the uniqueness flag:
+   sort a.txt | uniq -u
+
+
+8. Draw the hierarchy of processes created by the code below, including the parent process:
+   for(i=0; i<3; i++) {
+       fork();
+       execlp("ls", "ls", "/", NULL);
+   }
+   -----------------------------------------------------------------------------
+   Answer:
+   The hierarchy structure forms a master parent process branch that forks exactly 
+   3 independent children before exiting:
+   
+          Parent (i=0)
+             |
+       +-----+-----+
+       |           |
+   Parent(i=1)   Child1 (Executes 'ls' instantly and terminates)
+       |
+   +---+---+
+   |       |
+   ...   Child2 (Executes 'ls' instantly and terminates)
+   
+   Justification: When fork() triggers, the newly created child process immediately 
+   moves to the next instruction line and executes 'execlp()'. This completely 
+   overwrites the child's memory image with the 'ls' program binary. Consequently, 
+   the child terminates and never loops. Only the original master parent process 
+   survives to loop and call fork() up to 3 times. Total processes: 1 parent + 3 children.
+
+
+9. Draw the hierarchy of processes created by the code below, including the parent process:
+   for(i=0; i<3; i++) {
+       if(fork() > 0) {
+           wait(0);
+           wait(0);
+           exit(0);
+       }
+   }
+   -----------------------------------------------------------------------------
+   Answer:
+   The process generation hierarchy forms a single linear chain of descent:
+   Parent -> Child1 -> Child2 -> Child3
+   
+   Justification: At loop iteration index i=0, the parent calls fork(). The parent 
+   receives a positive child PID return value, making 'fork() > 0' evaluate to True. 
+   It enters the conditional block, waits for its child, and exits. Meanwhile, 
+   Child1 receives a 0 return status, bypasses the conditional block, and loops 
+   to index i=1 to spawn Child2. This sequential processing model creates a 
+   straight linear tree structure.
+
+
+10. Explain why the file descriptor returned by popen must be closed with pclose instead of fclose.
+    ----------------------------------------------------------------------------
+    Answer:
+    The popen() standard library routine constructs an internal process engine by 
+    forking a child shell and running an explicit data pipeline channel. While a standard 
+    fclose() call only flushes and tears down the basic runtime memory stream buffer, 
+    pclose() also calls waitpid() on the hidden child process. This captures its exit 
+    status code and prevents it from turning into a system zombie process.
+
+
+11. Give an advantage and a disadvantage of the First Fit placement policy versus the Worst-Fit placing policy.
+    ----------------------------------------------------------------------------
+    Answer:
+    - Advantage: First Fit is computationally faster because it allocates the very 
+      first memory block it finds that is large enough, rather than searching the 
+      entire global memory block list.
+    - Disadvantage: It causes high rates of external fragmentation near the head 
+      of the memory list, creating small, unusable memory holes over time.
+
+
+12. Give an example of distinct values greater than 0 for T, N1, N2, and N3 for which the program below finishes execution:
+    pthread_barrier_t b1, b2;
+    void* f1(void* a) { pthread_barrier_wait(&b1); return NULL; }
+    void* f2(void* a) { pthread_barrier_wait(&b2); return NULL; }
+    int main() {
+        int i; pthread_t t[T][2];
+        pthread_barrier_init(&b1, NULL, N1);
+        pthread_barrier_init(&b2, NULL, N2);
+        for(i=0; i<T; i++) {
+            pthread_create(&t[i][0], NULL, f1, NULL);
+            pthread_create(&t[i][1], NULL, f2, NULL);
+        }
+        for(i=0; i<T; i++) {
+            pthread_join(t[i][0], NULL); pthread_join(t[i][1], NULL);
+        }
+        pthread_barrier_destroy(&b1); pthread_barrier_destroy(&b2);
+        return NULL;
+    }
+    ----------------------------------------------------------------------------
+    Answer:
+    Valid values: T = 4, N1 = 4, N2 = 4, N3 = 1 (N3 can be any positive value).
+    
+    Justification: The program loop generates exactly T instances of the f1 thread 
+    and T instances of the f2 thread. To ensure the barriers release successfully and 
+    do not deadlock execution, the thread arrival threshold requirements (N1 and N2) 
+    must equal or evenly divide the total count of running worker threads T.
+
+
+13. Give five GREP commands that display all the lines in a file that contain letter "a" uppercase or lowercase.
+    ----------------------------------------------------------------------------
+    Answer:
+    1. grep -i "a" file.txt
+    2. grep "[aA]" file.txt
+    3. grep -E "a|A" file.txt
+    4. grep "a\|A" file.txt
+    5. grep -P "(?i)a" file.txt
+
+
+14. Give one advantage and one disadvantage of the set-associative caches versus the direct caches.
+    ----------------------------------------------------------------------------
+    Answer:
+    - Advantage: It significantly reduces cache thrashing and memory line conflicts 
+      by allowing a memory block to be mapped to multiple lines within its assigned 
+      cache set.
+    - Disadvantage: It increases hardware complexity and latency because the cache 
+      controller must search through multiple lines within a set simultaneously using 
+      comparators.
+
+
+15. Give one advantage and one disadvantage of the segmented allocation method over the paged allocation method.
+    ----------------------------------------------------------------------------
+    Answer:
+    - Advantage: Segments match a programmer's logical view of an application 
+      (separating data, code blocks, stacks, and subroutines), which simplifies memory 
+      sharing and access control protections.
+    - Disadvantage: It can cause severe external memory fragmentation because segments 
+      have variable lengths, requiring complex compaction routines over time.
+
+
+16. Give three function calls that ensure mutual exclusion.
+    ----------------------------------------------------------------------------
+    Answer:
+    1. pthread_mutex_lock(&mutex);
+    2. sem_wait(&semaphore); // When configured as a binary semaphore
+    3. pthread_rwlock_wrlock(&rwlock);
+
+
+17. Give three regular expressions that match any non-negative number multiple of 5.
+    ----------------------------------------------------------------------------
+    Answer:
+    1. ^(0|[1-9][0-9]*[05])$
+    2. ^[0-9]*[05]$
+    3. ^([05]|[1-9][0-9]*0|[1-9][0-9]*5)$
+
+
+18. Give three ways of finding the size of a file on the Linux command line.
+    ----------------------------------------------------------------------------
+    Answer:
+    1. wc -c file.txt
+    2. stat -c %s file.txt
+    3. ls -l file.txt | awk '{print $5}'
+
+
+19. Give three GREP commands that display the lines of a file which consist exclusively of a non-empty sequence of alternating letters and digits (e.g., a0g or 1r5m).
+    ----------------------------------------------------------------------------
+    Answer:
+    1. grep -E "^([a-zA-Z]([0-9][a-zA-Z])*|[0-9]([a-zA-Z][0-9])*)[0-9]?$" file.txt
+    2. grep -E -i "^([a-z]([0-9][a-z])*|[0-9]([a-z][0-9])*)[0-9]?$" file.txt
+    3. grep -E "^([A-Za-z][0-9])*[A-Za-z]?$|^([0-9][A-Za-z])*[0-9]?$" file.txt
+
+
+20. Give a regular expression that matches any even-length sequence of lower-case words separated by spaces, if for each word its length and its position in the sequence are either both odd or both even. The words are counted starting with 1. (Ex: the 5th word must have odd length and the 16th word must have even length).
+    ----------------------------------------------------------------------------
+    Answer:
+    Expression: ^([a-z]([a-z][a-z])*\s+[a-z][a-z]([a-z][a-z])*)(\s+[a-z]([a-z][a-z])*\s+[a-z][a-z]([a-z][a-z])*)*$
+    
+    Justification: Word 1 (odd position) must have an odd number of characters
