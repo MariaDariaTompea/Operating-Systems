@@ -1,0 +1,1033 @@
+================================================================================
+           OPERATING SYSTEMS EXAM STUDY GUIDE (COMPLETE MASTER LIST)
+================================================================================
+
+Q1. Add the necessary C code so that file b.txt is overwritten with the content 
+    of file a.txt from the instruction below:
+    execlp("cat", "cat", "a.txt", NULL);
+--------------------------------------------------------------------------------
+Answer:
+You must open 'b.txt' with write permissions, redirect the standard output 
+stream (file descriptor 1) to point to it using dup2(), and then perform 
+the execution swap.
+
+Code implementation:
+int fd = open("b.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+dup2(fd, 1);
+close(fd);
+execlp("cat", "cat", "a.txt", NULL);
+
+
+Q2. Add the necessary instructions to the code fragment below, so that the 
+    standard input of command /bin/pwd to be read from PIPE p.
+    int p[2]; pipe(p);
+    if(fork() == 0) {
+        // Add code here
+        execv("/bin/pwd", "/bin/pwd", NULL);
+        exit(0);
+    }
+--------------------------------------------------------------------------------
+Answer:
+Inside the child block, redirect standard input (descriptor 0) to track the 
+read end of the pipe, and close the unused write end descriptor.
+
+Code implementation:
+dup2(p[0], 0);
+close(p[0]);
+close(p[1]);
+execv("/bin/pwd", (char*[]){"/bin/pwd", NULL});
+
+
+Q3. Can you create a hard link towards a file on a different partition? 
+    Justify your answer.
+--------------------------------------------------------------------------------
+Answer:
+No. Hard links map a directory entry directly to an inode number, which is unique and 
+isolated within its specific filesystem partition. Creating a hard link across 
+partitions is impossible because distinct partitions manage independent inode tables.
+
+
+Q4. Consider the producer-consumer problem with a buffer of capacity N. How 
+    many semaphores would you use to ensure operation correctness and what 
+    would be the semaphores' initial values?
+--------------------------------------------------------------------------------
+Answer:
+You need 3 semaphores: a binary semaphore `mutex` initialized to 1 for mutual exclusion, 
+a counting semaphore `empty` initialized to N to track empty slots, and a counting 
+semaphore `full` initialized to 0 to track available filled items.
+
+
+Q5. Consider that function f is executed simultaneously by 10 threads. Add the 
+    necessary lines of code to ensure that the value of n is 10 after the 
+    threads have completed:
+    int n = 0;
+    void* f(void* p) {
+        n++;
+        return NULL;
+    }
+--------------------------------------------------------------------------------
+Answer:
+The bare shared statement 'n++' causes data corruption via race conditions. 
+It must be wrapped cleanly using a mutual exclusion lock wrapper.
+
+Fixed code implementation:
+int n = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void* f(void* p) {
+    pthread_mutex_lock(&mtx);
+    n++;
+    pthread_mutex_unlock(&mtx);
+    return NULL;
+}
+
+
+Q6. Considering that the size of a block is B and the size of an address is A, 
+    how many data blocks are addressed by the double indirect addressing of 
+    an i-node?
+--------------------------------------------------------------------------------
+Answer:
+The total number of addressable data blocks is $(B / A)^2$. This is because a single block 
+can hold $(B / A)$ address pointers, and under double indirection, each of those 
+pointers references another full block containing $(B / A)$ block pointers.
+
+
+Q7. Considering that the size of a block is B and the size of an address is A, 
+    how many data blocks are addressed by the triple indirect addressing of 
+    an inode?
+--------------------------------------------------------------------------------
+Answer:
+The total number of addressable data blocks is $(B / A)^3$. Following three levels of pointer 
+mapping indirection, each layer multiplies the address pointer capacity of a single 
+block by itself, yielding a cubed block density.
+
+
+Q8. Display only the lines of file a.txt that appear only once (not duplicated).
+--------------------------------------------------------------------------------
+Answer:
+sort a.txt | uniq -u
+
+
+Q9. Display the number of files in a directory and all its hierarchy of subdirectories.
+--------------------------------------------------------------------------------
+Answer:
+find . -type f | wc -l
+
+
+Q10. Display the number of processes of each active user in the system.
+--------------------------------------------------------------------------------
+Answer:
+ps -eo user= | sort | uniq -c
+
+
+Q11. Draw the hierarchy of processes created by the code below, including the 
+     parent process:
+     for(i=0; i<3; i++) {
+         fork();
+         execlp("ls", "ls", "/", NULL);
+     }
+--------------------------------------------------------------------------------
+Answer:
+The hierarchy structure forms a master parent process branch that forks exactly 
+3 independent children before exiting:
+
+          Parent (i=0)
+              |
+        +-----+-----+
+        |           |
+   Parent(i=1)    Child1 (Executes 'ls' instantly and terminates)
+        |
+    +---+---+
+    |       |
+   ...    Child2 (Executes 'ls' instantly and terminates)
+
+Justification: When fork() triggers, the newly created child process immediately 
+moves to the next instruction line and executes execlp(). This completely 
+overwrites the child's memory image with the 'ls' program binary. Consequently, 
+the child terminates and never loops. Only the original master parent process 
+survives to loop and call fork() up to 3 times. Total processes: 1 parent + 3 children.
+
+
+Q12. Draw the hierarchy of processes created by the code below, including the 
+     parent process:
+     for(i=0; i<3; i++) {
+         if(fork() > 0) {
+             wait(0);
+             wait(0);
+             exit(0);
+         }
+     }
+--------------------------------------------------------------------------------
+Answer:
+The process generation hierarchy forms a single linear chain of descent:
+Parent -> Child1 -> Child2 -> Child3
+
+Justification: At loop iteration index i=0, the parent calls fork(). The parent 
+receives a positive child PID return value, making 'fork() > 0' evaluate to True. 
+It enters the conditional block, waits for its child, and exits. Meanwhile, 
+Child1 receives a 0 return status, bypasses the conditional block, and loops 
+to index i=1 to spawn Child2. This sequential processing model creates a 
+straight linear tree structure.
+
+
+Q13. Draw the process hierarchy created by calling f(3).
+     void f(int n) {
+         if (n > 0 && fork() == 0) {
+             f(n-1);
+             exit(0);
+         }
+         wait(0);
+     }
+--------------------------------------------------------------------------------
+Answer:
+The hierarchy forms a linear chain of 3 cascading child processes:
+Parent -> Child(n=3) -> Child(n=2) -> Child(n=1)
+
+Justification: When f(3) is called, n > 0 is true. The process runs fork(). The 
+parent process breaks out of the conditional block because its return value is 
+the child's non-zero PID, dropping directly down to block at wait(0). The child 
+process receives a 0 return value, matches the condition, and recursively invokes 
+f(2). This pattern repeats sequentially until n reaches 0.
+
+
+Q14. Draw the hierarchy of processes generated by the code of below, excluding 
+     the parent process:
+     int p = 0;
+     for(i=0; i<3; i++) {
+         if (p == 0) p = fork();
+         else wait(0);
+     }
+--------------------------------------------------------------------------------
+Answer:
+The code creates a master parent process that spawns exactly 3 independent, 
+parallel child processes directly beneath it:
+
+          Parent
+        /   |   \
+    Child1 Child2 Child3
+
+Justification: Initially, p = 0. At i = 0, the parent enters the if block and 
+forks, saving the child's non-zero PID into its local variable p. Meanwhile, 
+Child 1 inherits p = 0, but its fork return value is 0, so its local variable p remains 0.
+At i = 1, the parent has p > 0, so it skips to the else block and waits. Child 1 
+has p == 0, enters the if block, and forks to create Child 2. This execution loop 
+constructs a simple parallel tree. Total created processes = 3.
+
+
+Q15. Explain why the file descriptor returned by popen must be closed with 
+     pclose instead of fclose.
+--------------------------------------------------------------------------------
+Answer:
+The popen() routine forks a hidden child process to establish a command pipeline. 
+While fclose() only frees the basic input/output stream buffers in memory, pclose() 
+additionally calls waitpid() to collect the child's exit status and prevent it 
+from becoming a zombie.
+
+
+Q16. File a.txt contains lines of numbers separated by space. Write a UNIX Shell 
+     command that applied to a.txt displays for each line the sum of the first 
+     and last number on the line.
+--------------------------------------------------------------------------------
+Answer:
+awk '{print $1 + $NF}' a.txt
+
+
+Q17. Give an advantage and a disadvantage of the First Fit placement policy 
+     versus the Worst-Fit placing policy.
+--------------------------------------------------------------------------------
+Answer:
+First Fit is significantly faster because it allocates the first free memory block 
+it encounters that is large enough, rather than searching the entire list. However, 
+it leads to severe external fragmentation by creating small, unusable memory holes 
+at the head of the block list.
+
+
+Q18. Give an example of distinct values greater than 0 for T, N1, N2, and N3 for 
+     which the program below finishes execution:
+     pthread_barrier_t b1, b2;
+     void* f1(void* a) { pthread_barrier_wait(&b1); return NULL; }
+     void* f2(void* a) { pthread_barrier_wait(&b2); return NULL; }
+     int main() {
+         int i; pthread_t t[T][2];
+         pthread_barrier_init(&b1, NULL, N1);
+         pthread_barrier_init(&b2, NULL, N2);
+         for(i=0; i<T; i++) {
+             pthread_create(&t[i][0], NULL, f1, NULL);
+             pthread_create(&t[i][1], NULL, f2, NULL);
+         }
+         for(i=0; i<T; i++) {
+             pthread_join(t[i][0], NULL); pthread_join(t[i][1], NULL);
+         }
+         pthread_barrier_destroy(&b1); pthread_barrier_destroy(&b2);
+         return NULL;
+     }
+--------------------------------------------------------------------------------
+Answer:
+Valid values are T = 4, N1 = 4, N2 = 4, and N3 = 1. The program loops T times, 
+spawning T instances of f1 and T instances of f2. To prevent a permanent deadlock, 
+the barrier sync thresholds (N1 and N2) must match or evenly divide the total 
+number of arriving worker threads T.
+
+
+Q19. Give five GREP commands that display all the lines in a file that contain 
+     letter "a" uppercase or lowercase.
+--------------------------------------------------------------------------------
+Answer:
+1. grep -i "a" file.txt
+2. grep "[aA]" file.txt
+3. grep -E "a|A" file.txt
+4. grep "a\|A" file.txt
+5. grep -P "(?i)a" file.txt
+
+
+Q20. Give one advantage and one disadvantage of the set-associative caches 
+     versus the direct caches.
+--------------------------------------------------------------------------------
+Answer:
+Set-associative caches drastically reduce cache line collisions and thrashing by 
+allowing blocks to map to multiple indices within an assigned set. However, 
+they introduce higher circuit complexity and latency because multiple slots 
+must be searched in parallel using hardware comparators.
+
+
+Q21. Give one advantage and one disadvantage of the segmented allocation method 
+     over the paged allocation method.
+--------------------------------------------------------------------------------
+Answer:
+Segmented allocation aligns memory chunks with a programmer's logical divisions 
+(code, stack, variables), which simplifies memory sharing, access permissions, 
+and avoids internal fragmentation. Its disadvantage is that variable segment lengths 
+cause severe external fragmentation, requiring slow, costly memory compaction.
+
+
+Q22. Give the operators for the following shell test verifications:
+     * string is not empty
+     * is executable
+     * is different (for numbers)
+     * is directory
+--------------------------------------------------------------------------------
+Answer:
+* String is not empty: -n  (e.g., [ -n "$str" ])
+* Is executable:       -x  (e.g., [ -x "$file" ])
+* Is different:        -ne (e.g., [ "$num1" -ne "$num2" ])
+* Is directory:        -d  (e.g., [ -d "$dir" ])
+
+
+Q23. Give three function calls that ensure mutual exclusion.
+--------------------------------------------------------------------------------
+Answer:
+1. pthread_mutex_lock(&mutex);
+2. sem_wait(&semaphore); // when configured as a binary semaphore
+3. pthread_rwlock_wrlock(&rwlock);
+
+
+Q24. Give three regular expressions that match any non-negative number multiple of 5.
+--------------------------------------------------------------------------------
+Answer:
+1. ^(0|[1-9][0-9]*[05])$
+2. ^[0-9]*[05]$
+3. ^([05]|[1-9][0-9]*0|[1-9][0-9]*5)$
+
+
+Q25. Give three ways of finding the size of a file on the Linux command line.
+--------------------------------------------------------------------------------
+Answer:
+1. wc -c file.txt
+2. stat -c %s file.txt
+3. ls -l file.txt | awk '{print $5}'
+
+
+Q26. Give three GREP commands that display the lines of a file which consist 
+     exclusively of a non-empty sequence of alternating letters and digits 
+     (e.g., a0g or 1r5m).
+--------------------------------------------------------------------------------
+Answer:
+1. grep -E "^([a-zA-Z]([0-9][a-zA-Z])*|[0-9]([a-zA-Z][0-9])*)[0-9]?$" file.txt
+2. grep -E -i "^([a-z]([0-9][a-z])*|[0-9]([a-z][0-9])*)[0-9]?$" file.txt
+3. grep -E "^([A-Za-z][0-9])*[A-Za-z]?$|^([0-9][A-Za-z])*[0-9]?$" file.txt
+
+
+Q27. Give a regular expression that matches any even-length sequence of 
+     lower-case words separated by spaces, if for each word its length and its 
+     position in the sequence are either both odd or both even. The words are 
+     counted starting with 1.
+--------------------------------------------------------------------------------
+Answer:
+^([a-z]([a-z][a-z])*\s+[a-z][a-z]([a-z][a-z])*)(\s+[a-z]([a-z][a-z])*\s+[a-z][a-z]([a-z][a-z])*)*$
+
+
+Q28. Given a directory and all its hierarchy, write a UNIX Shell command that 
+     displays all sub-directories containing .c files.
+--------------------------------------------------------------------------------
+Answer:
+find . -type f -name "*.c" -exec dirname {} \; | sort -u
+
+
+Q29. Given a UNIX file system configured with a block size of B bytes that can 
+     contain A addresses, and i-nodes having D direct links, one simple 
+     indirection link, one double indirection link, and one triple indirection 
+     link, give the formula for the maximum file size possible.
+--------------------------------------------------------------------------------
+Answer:
+Max Blocks = $D + (B / A) + (B / A)^2 + (B / A)^3$
+Maximum File Size = $[D + (B / A) + (B / A)^2 + (B / A)^3] \times B$ bytes
+
+
+Q30. Given two set-associative caches, one with 2 sets of 4 pages and one with 
+     4 sets of 2 pages, which would perform better for the following sequence 
+     of page requests: 20, 9, 18, 27, 20, 9, 18, 27. Why?
+--------------------------------------------------------------------------------
+Answer:
+The cache with 4 sets of 2 pages performs better. Using the mapping index formula 
+`Set = Page % Total_Sets`, the 4-set configuration splits the pages perfectly 
+into distinct sets (Set 0, 1, 2, 3), resulting in pure hits after initial loads. 
+The 2-set setup causes immediate capacity conflicts and continuous thrashing.
+
+
+Q31. How can you increment the value of a POSIX semaphore?
+--------------------------------------------------------------------------------
+Answer:
+By calling the sem_post(&sem); function. This increments the internal integer counter 
+of the semaphore and wakes up the first thread blocked in its waiting sleep queue.
+
+
+Q32. How can you redirect on the command line the standard error through a pipe 
+     to another program?
+--------------------------------------------------------------------------------
+Answer:
+By merging standard error (descriptor 2) into standard output (descriptor 1) 
+using the operator 2>&1 before the pipe. For example: `command 2>&1 | program`.
+
+
+Q33. How is the address calculation done in the absolute fixed partition-allocation?
+--------------------------------------------------------------------------------
+Answer:
+The logical address generated by the compiler is identical to the final physical 
+address in memory. Because programs are bound to a fixed, unchangeable slot, the 
+system does not perform runtime relocation offset calculations.
+
+
+Q34. How many FIFOs can a process open for reading if the FIFOs are and will 
+     ever be used by other processes only for writing?
+--------------------------------------------------------------------------------
+Answer:
+Zero. Opening a FIFO for reading blocks indefinitely until another process opens it 
+for writing. If other processes open it only for writing, the reader will successfully open 
+the FIFO, but the total number of FIFOs it can open is bounded only by the system's 
+per-process open file descriptor limit.
+
+
+Q35. How many FIFOs can a process open if they are not and will not ever be used 
+     by any other process?
+--------------------------------------------------------------------------------
+Answer:
+Zero if opened normally. The open() system call blocks until a separate process 
+opens the complementary end of the FIFO. Unless the non-blocking flag (O_NONBLOCK) 
+is explicitly passed, a single process trying to open unbacked FIFOs will hang indefinitely.
+
+
+Q36. How many processes will be created by the code fragment below, excluding 
+     the initial parent process?
+     fork(); wait(0); fork(); wait(0); fork();
+--------------------------------------------------------------------------------
+Answer:
+7 child processes are created. Each fork doubles the active number of processes 
+in the execution pool, yielding $2^3 = 8$ total processes minus the parent.
+
+
+Q37. How many processes are created by the code fragment below, excluding the 
+     initial parent process?
+     if (fork() || fork()) { fork(); }
+--------------------------------------------------------------------------------
+Answer:
+4 child processes. The parent process hits the first fork() (creating Child 1), 
+short-circuits the OR logic, enters the block, and triggers the third fork() (Child 2). 
+Child 1 evaluates the second fork() (creating Child 3), evaluates the condition 
+as true, enters the block, and forks again (creating Child 4).
+
+
+Q38. How many processes are created by the code fragment below, when the parent 
+     process P calls f(3)?
+     void f(int n){
+         if (n > 0 || fork() == 0) {
+             f(n-1);
+             exit(0);
+         }
+         wait(0);
+     }
+--------------------------------------------------------------------------------
+Answer:
+Infinite loop / Fork bomb. When f(3), f(2), and f(1) execute, $n > 0$ short-circuits 
+the fork. At f(0), $n > 0$ is false, causing fork() to execute; the child receives 0, 
+enters the block, and recursively calls f(-1), spawning an endless chain of processes.
+
+
+Q39. How many processes are created by the code fragment below, excluding the 
+     initial parent process?
+     for(i=0; i<8; i++) {
+         if(i % 2 != 1) { fork(); }
+     }
+--------------------------------------------------------------------------------
+Answer:
+15 child processes. The condition `i % 2 != 1` matches even values (i = 0, 2, 4, 6), 
+meaning fork() executes exactly 4 times. Since every execution doubles the process 
+count, it generates $2^4 = 16$ total processes, or 15 child processes.
+
+
+Q40. How many processes will be created by the code fragment below, excluding 
+     the initial parent process?
+     if (fork() != fork()) { fork(); }
+--------------------------------------------------------------------------------
+Answer:
+6 child processes. The first fork creates a child. The second fork runs in both 
+the parent and first child, producing two more processes. Because the returned PIDs 
+from the two calls differ in the original parent and child paths, both enter the 
+if block and execute the third fork, adding two final processes.
+
+
+Q41. How many threads will you use for processing a million files? Justify your answer.
+--------------------------------------------------------------------------------
+Answer:
+You should use a thread pool scaled to the number of physical/logical CPU cores 
+on the machine (or slightly higher if tasks are highly I/O bound). Spawning a 
+million independent threads will instantly crash the OS due to memory exhaustion 
+and context-switching thrashing.
+
+
+Q42. In the program fragment below, mark which process executes each line: 
+     the Parent, the Child, or Both.
+--------------------------------------------------------------------------------
+Answer:
+[P|C] k = fork();   -> Both (Spawns the child process).
+[P|C] if(k == 0) {  -> Both (Evaluated by both paths).
+[ |C]     printf("A\n"); -> Child Only (Because k == 0 is true in the child).
+[P|C] }
+[P| ] else {        -> Parent Only (Because k > 0 matches parent state).
+[P| ]     printf("B\n"); -> Parent Only.
+[P|C] }
+[P|C] printf("C\n");     -> Both (Executed by both threads after the condition block).
+
+
+Q43. Schedule the following jobs (given as Name/Duration/Deadline) so that the 
+     sum of their delays is minimized:
+     A/5/7, B/2/4, C/4/13, D/3/8
+--------------------------------------------------------------------------------
+Answer:
+The optimal sequence is B -> A -> D -> C. 
+* B runs from 0 to 2 (delay 0). 
+* A runs from 2 to 7 (delay 0). 
+* D runs from 7 to 10 (delay 2). 
+* C runs from 10 to 14 (delay 1). 
+Total minimized delay is $0 + 0 + 2 + 1 = 3$ seconds.
+
+
+Q44. Schedule the following jobs (given as Name/Duration/Deadline) so that they 
+     all meet their deadlines:
+     A/5/9, B/7/11, C/1/10
+--------------------------------------------------------------------------------
+Answer:
+The optimal order is A -> C -> B. Note that it is mathematically impossible for 
+all jobs to meet their deadlines because the total processing time required is 13 
+seconds ($5 + 7 + 1$), which exceeds the final deadline of 11. Running A then C 
+minimizes the overall delay.
+
+
+Q45. Schedule the following jobs (given as Name/Duration/Deadline) so that the 
+     sum of their delays is minimized: 
+     A/3/8, B/10/15, C/3/5.
+--------------------------------------------------------------------------------
+Answer:
+The optimal schedule is C -> A -> B. 
+* C runs from 0 to 3 (delay 0). 
+* A runs from 3 to 6 (delay 0). 
+* B runs from 6 to 16 (delay 1). 
+The total minimized delay is exactly 1 second.
+
+
+Q46. What are the possible console outputs of the following code fragment 
+     (ignore any output that execl might generate), and when will they happen?
+     printf("A\n"); execl(.....); printf("B\n");
+--------------------------------------------------------------------------------
+Answer:
+* Output "A" only: Occurs if execl() succeeds, replacing the process image and 
+  making subsequent lines unreachable.
+* Output "A" followed by "B": Occurs only if execl() fails (e.g. invalid path), 
+  allowing execution to continue downward.
+
+
+Q47. What is a "critical section"?
+--------------------------------------------------------------------------------
+Answer:
+A critical section is a block of code that modifies shared resources (like global 
+variables or files) that must not be concurrently accessed by more than one 
+process or thread at a time to prevent data corruption.
+
+
+Q48. What is a binary semaphore, and what is the effect of its P method, when 
+     called by multiple concurrent processes/threads?
+--------------------------------------------------------------------------------
+Answer:
+A binary semaphore handles values 0 and 1 to act as a mutex lock. When P (sem_wait) 
+is called, a value of 1 drops to 0 and the thread passes; if the value is 0, the 
+thread blocks and joins a waiting queue until a V (sem_post) signal arrives.
+
+
+Q49. What is the content of the superblock on a Linux disk?
+--------------------------------------------------------------------------------
+Answer:
+The superblock contains structural metadata describing the filesystem partition. 
+This includes the filesystem size, total block count, inode allocations, status 
+flags, block sizes, and filesystem type magic numbers.
+
+
+Q50. What is the effect of calling pthread_barrier_wait on a barrier initialized with 1?
+--------------------------------------------------------------------------------
+Answer:
+The calling thread will never block or wait. Because the barrier condition requires 
+only a single thread to trip the release threshold, the condition is met instantly 
+and execution continues.
+
+
+Q51. What is the maximum number of child processes, created by the code below, 
+     that can coexist simultaneously?
+     for (i = 0; i < 7; i++){
+       if (fork() == 0){
+         sleep(rand() % 10);
+         exit(0);
+       }
+       if (i % 3 == 0)
+         wait(0);
+     }
+--------------------------------------------------------------------------------
+Answer:
+3 child processes. At i=0, Child 1 is created, and the parent waits until it exits. 
+At i=1 and i=2, Children 2 and 3 are spawned. At i=3, Child 4 is born, and the parent 
+waits for one child to exit, keeping the maximum overlapping limit at 3.
+
+
+Q52. What is the most prioritary memory page that the NRU (Not Recently Used) 
+     replacement policy chooses as a victim page?
+--------------------------------------------------------------------------------
+Answer:
+NRU prioritizes Class 0 pages as victims. These are pages that have not been 
+referenced and have not been modified (Referenced bit = 0, Modified bit = 0) 
+within the current clock cycle interval.
+
+
+Q53. What is the principle of locality regarding pages loading?
+--------------------------------------------------------------------------------
+Answer:
+The principle of locality states that programs focus on a small, localized region 
+of memory over short time horizons. It includes temporal locality (re-accessing 
+the same variables in loops) and spatial locality (reading sequential array entries).
+
+
+Q54. What could happen if function f were executed by several simultaneous threads? Why?
+     pthread_mutex_t m[2];
+     void* f(void* p) {
+         int id = (int)p;
+         pthread_mutex_t* first = &m[id % 2];
+         pthread_mutex_t* second = &m[(id+1) % 2];
+         pthread_mutex_lock(first);
+         pthread_mutex_lock(second);
+         ...
+         pthread_mutex_unlock(second);
+         pthread_mutex_unlock(first);
+     }
+--------------------------------------------------------------------------------
+Answer:
+An execution deadlock will occur due to a circular wait condition. If Thread 1 running 
+id=0 locks m[0] and tries to get m[1], while Thread 2 running id=1 locks m[1] and 
+tries to get m[0] at the same instant, both block permanently waiting for each other.
+
+
+Q55. What does the system call "open" do before returning from opening a FIFO?
+--------------------------------------------------------------------------------
+Answer:
+Unless opened with the O_NONBLOCK flag, open() blocks execution until a complementary 
+process opens the opposite end of the pipe (e.g. opening for reading blocks until 
+another process opens for writing).
+
+
+Q56. What does the system call "read" do when the pipe contains less data than 
+     it is required to read, but it is not empty?
+--------------------------------------------------------------------------------
+Answer:
+The read() system call does not block. It immediately extracts whatever partial bytes 
+are currently available inside the pipe buffer, loads them into memory, and returns 
+the actual byte count read.
+
+
+Q57. What does the system call "read" do when the pipe is empty?
+--------------------------------------------------------------------------------
+Answer:
+If any process still has the write end of the pipe open, read() blocks and puts 
+the calling process to sleep until data is written. If all write ends are closed, 
+read() immediately returns 0 to signal End-of-File (EOF).
+
+
+Q58. What does the system call “write” do when a FIFO contains less space than 
+     the data it is required to write, but it is not full?
+--------------------------------------------------------------------------------
+Answer:
+If the payload size is $\le$ PIPE_BUF, the write is atomic; the process blocks 
+until enough space opens to write all data at once. If the payload is $>$ PIPE_BUF, 
+the write is non-atomic; it writes what it can fit and blocks until readers clear room.
+
+
+Q59. What happens with the data when you delete a file that has a hard link 
+     pointing to it?
+--------------------------------------------------------------------------------
+Answer:
+The directory entry is unlinked and the internal reference link counter drops by 1. 
+The actual file data blocks remain intact on the disk and accessible through the 
+remaining hard links, and are cleared only when the reference counter hits zero.
+
+
+Q60. What happens with a process between the moment it finishes and the moment 
+     its parent calls wait?
+--------------------------------------------------------------------------------
+Answer:
+The process becomes a Zombie process. It surrenders its execution memory space 
+and resource maps but retains its structural entry and exit code inside the OS 
+Process Table for the parent to read.
+
+
+Q61. What state transition will a process undergo when it calls sem_wait and 
+     under what conditions? Justify your answer.
+--------------------------------------------------------------------------------
+Answer:
+If the semaphore is $>0$, the process decrements the counter and experiences no state 
+transition (remains RUN). If the semaphore is $\le 0$, the process transitions 
+from RUN to WAIT (Blocked) and enters a sleep queue until a signal wakes it.
+
+
+Q62. What state transition will a process undergo when reading from a file?
+--------------------------------------------------------------------------------
+Answer:
+The process transitions from RUN to WAIT (Blocked). It remains suspended while 
+the storage device performs physical track seeks and moves the requested blocks 
+into RAM, returning to READY once the transfer concludes.
+
+
+Q63. What will the code fragment below print to the console?
+     char *s[3] = {"A", "B", "C"};
+     for (int i = 0; i < 3; i++){
+       execl("/bin/echo", "/bin/echo", s[i], NULL);
+     }
+--------------------------------------------------------------------------------
+Answer:
+It will print only "A". On the first iteration, execl() successfully replaces 
+the calling process image with the echo binary, which clears the memory map 
+and prevents the loop from completing iterations B and C.
+
+
+Q64. What will the fragment below print? Justify your answer.
+     execl("expr", "expr", "1", "+", "1", NULL);
+     execlp("echo", "echo", "3", NULL);
+     printf("4\n");
+--------------------------------------------------------------------------------
+Answer:
+It will print "3". The first execl() fails because it lacks an absolute path 
+(/usr/bin/expr) and does not parse PATH, dropping execution to execlp(), which 
+successfully finds echo via PATH, overwrites the image, and exits.
+
+
+Q65. What will the code fragment below print to the console?
+     int p[2]; char buf[10]; int n;
+     pipe(p);
+     n = read(p[0], buf, 10);
+     printf("%d\n", n);
+--------------------------------------------------------------------------------
+Answer:
+The program will deadlock and print nothing. Because the write descriptor (p[1]) 
+remains open within the same process, the read() call blocks indefinitely on the 
+empty pipe, preventing execution from reaching the printf statement.
+
+
+Q66. What will be the effect of replacing calls to pthread_mutex_lock with 
+     calls to pthread_rwlock_rdlock?
+--------------------------------------------------------------------------------
+Answer:
+It allows multiple threads to acquire read locks and access the critical section 
+simultaneously without blocking. However, it removes exclusive write protections, 
+introducing race conditions if any thread tries to modify data during a read.
+
+
+Q67. What will be the effect of replacing calls to pthread_mutex_lock with 
+     calls to sem_post?
+--------------------------------------------------------------------------------
+Answer:
+It completely destroys mutual exclusion. Instead of locking and protecting a 
+critical section, calling sem_post immediately increments a semaphore value and 
+returns, letting multiple threads enter the critical section concurrently.
+
+
+Q68. When would you use execv instead of execl?
+--------------------------------------------------------------------------------
+Answer:
+You use execv when the argument list for the new binary is dynamic and determined 
+at runtime, allowing you to pass them as an array of pointers (`char* argv[]`). 
+You use execl when the arguments are static and hardcoded.
+
+
+Q69. When would you load into memory the pages of a process that is just starting?
+--------------------------------------------------------------------------------
+Answer:
+You should load them on-demand using Demand Paging as page faults occur during 
+runtime execution. Pre-loading all pages at startup wastes physical RAM on 
+program modules and execution branches that might never be called.
+
+
+Q70. When would you prefer using a process instead of a thread?
+--------------------------------------------------------------------------------
+Answer:
+You prefer a process when you need complete memory isolation to prevent a fault 
+in one task from crashing others, when you need distinct security privilege 
+sandboxing, or to avoid complex multi-threaded locking bugs.
+
+
+Q71. When does a process change state from RUN to READY?
+--------------------------------------------------------------------------------
+Answer:
+A process changes from RUN to READY when its allocated CPU execution time slice 
+expires (quantum timeout), or when a higher-priority process arrives and preempts it.
+
+
+Q72. Why are zombie processes problematic?
+--------------------------------------------------------------------------------
+Answer:
+Zombie processes retain their entry in the operating system's internal Process 
+Table. If left uncollected by a parent, an accumulation of zombies can exhaust 
+the system's strict allocation limit of Process Identifiers (PIDs), preventing 
+new processes from spawning.
+
+
+Q73. Why should the thread recheck the condition after returning from the 
+     pthread_cond_wait call?
+--------------------------------------------------------------------------------
+Answer:
+Threads must recheck conditions to handle spurious wakeups and prevent race 
+conditions where a different thread intercepts the signal, acquires the mutex first, 
+and changes the condition state back to false.
+
+
+Q74. Why is it not advisable to communicate bidirectionally through a single FIFO?
+--------------------------------------------------------------------------------
+Answer:
+Because a single FIFO utilizes a single shared data stream buffer. If two processes 
+attempt to write and read from the same FIFO simultaneously, a process may read 
+back its own sent data, or both can block waiting for input, causing a deadlock.
+
+
+Q75. What can you do as a software developer to prevent deadlocks?
+--------------------------------------------------------------------------------
+Answer:
+You can enforce a strict, uniform global ordering for lock acquisition across 
+all components, use non-blocking functions like `pthread_mutex_trylock()` to back off 
+if a resource is busy, and keep lock-holding windows minimal.
+
+
+Q76. Write an AWK command that displays the sum of the next to last field of all lines.
+--------------------------------------------------------------------------------
+Answer:
+awk '{sum += $(NF-1)} END {print sum}' file.txt
+
+
+Q77. Write an AWK command that displays the sum of all the numbers in a text 
+     file whose lines consist of sequences of digits separated by spaces.
+--------------------------------------------------------------------------------
+Answer:
+awk '{for(i=1; i<=NF; i++) sum += $i} END {print sum}' file.txt
+
+
+Q78. Write an AWK program that applied to a file containing words separated by 
+     spaces, calculates the average word count per line.
+--------------------------------------------------------------------------------
+Answer:
+awk '{total += NF; lines++} END {if (lines > 0) print total / lines; else print 0}' file.txt
+
+
+Q79. Write a regular expression that accepts any lines that contain at least three vowels.
+--------------------------------------------------------------------------------
+Answer:
+^[a-zA-Z]*[aeiouAEIOU][a-zA-Z]*[aeiouAEIOU][a-zA-Z]*[aeiouAEIOU][a-zA-Z]*$
+
+
+Q80. Write a regular expression that accepts lines that contain "a", but not "b".
+--------------------------------------------------------------------------------
+Answer:
+^[^b]*a[^b]*$
+
+
+Q81. Write two SED commands that display from a file only the lines that do not 
+     contain digit 7.
+--------------------------------------------------------------------------------
+Answer:
+Command 1: sed '/7/d' file.txt
+Command 2: sed -n '/7/!p' file.txt
+
+
+Q82. Write two SED commands that display a file's lines deleting the first 
+     non-empty sequence of lower-case letters.
+--------------------------------------------------------------------------------
+Answer:
+Command 1: sed 's/[a-z]//' file.txt
+Command 2: sed 's/[a-z]\{1,\}//' file.txt
+
+
+Q83. Write a UNIX Shell command that displays the lines in file a.txt that 
+     contain words STARTING with capital letters.
+--------------------------------------------------------------------------------
+Answer:
+grep -E '\<[A-Z]' a.txt
+
+
+Q84. Write a UNIX Shell command that inverts in file a.txt all pairs of 
+     neighboring digits (ex: a3972b -> a9327b).
+--------------------------------------------------------------------------------
+Answer:
+sed -E 's/([0-9])([0-9])/\2\1/g' a.txt
+
+
+Q85. Write a UNIX Shell command that displays for each line the sum of its 
+     numbers, given file a.txt contains on each line two numbers separated by space.
+--------------------------------------------------------------------------------
+Answer:
+awk '{print $1 + $2}' a.txt
+
+
+Q86. Write a UNIX Shell command that displays a list of all unique appearances 
+     of IDs belonging to the English or Romanian sections (e.g., amin234, 
+     mair5678) that appear in a text file a.txt.
+--------------------------------------------------------------------------------
+Answer:
+grep -o -E '\<(en|ro)[a-zA-Z0-9_]*\>' a.txt | sort -u
+
+
+Q87. Write a UNIX Shell command that displays all the lines in file a.txt that 
+     contain at least one natural number divisible by 5.
+--------------------------------------------------------------------------------
+Answer:
+grep -E '\<([0-9]*[05])\>' a.txt
+
+
+Q88. Write a UNIX Shell command that displays all lines from file a.txt that 
+     contain words made of an odd number of lower-case letters.
+--------------------------------------------------------------------------------
+Answer:
+grep -E '\<[a-z]([a-z][a-z])*\>' a.txt
+
+
+Q89. Write a UNIX Shell command that displays all the lines in file a.txt that 
+     contain at least one number with more than 2 decimal digits (i.e. -2.456, 
+     4.234, 0.457).
+--------------------------------------------------------------------------------
+Answer:
+grep -E '\<-?[0-9]+\.[0-9]{3,}\>' a.txt
+
+
+Q90. Write a UNIX Shell command that eliminates all non-letter characters from 
+     file a.txt (i.e. a B,5-9.+% -> aB).
+--------------------------------------------------------------------------------
+Answer:
+sed 's/[^a-zA-Z]//g' a.txt
+
+
+Q91. Write a UNIX command line instruction that reverses all pairs of a single 
+     odd digit followed by a vowel inside file a.txt.
+--------------------------------------------------------------------------------
+Answer:
+sed -E 's/([13579])([aeiouAEIOU])/\2\1/g' a.txt
+
+
+Q92. Write a UNIX command line filter that prints all soccer scores from file 
+     a.txt that are completely unique and followed immediately by a lowercase vowel.
+--------------------------------------------------------------------------------
+Answer:
+grep -o -E '[0-9]+-[0-9]+[aeiou]' a.txt | sort -u
+
+
+Q93. Write a single UNIX command that prints all lines from a.txt that contain a 
+     binary number consisting of at least 5 digits which is a multiple of 4.
+--------------------------------------------------------------------------------
+Answer:
+grep -E '\<[01]*00\>' a.txt | grep -E '[01]{5,}'
+
+
+Q94. Write a UNIX script Shell command that calculates the average size of files 
+     with extension .txt per directory in the current directory and all its subdirectories.
+--------------------------------------------------------------------------------
+Answer:
+find . -type d | while read -r dir; do
+    count=$(find "$dir" -maxdepth 1 -type f -name "*.txt" | wc -l)
+    if [ "$count" -gt 0 ]; then
+        total_size=$(find "$dir" -maxdepth 1 -type f -name "*.txt" -exec wc -c {} + | awk 'END{print $1}')
+        echo "Directory: $dir, Average Size: $((total_size / count)) bytes"
+    fi
+done
+
+
+Q95. Write a UNIX Shell script that calculates the average number of lines of 
+     code in all the files with extension ".sh" in the current directory, 
+     ignoring comment lines, empty lines, and the lines containing only spaces 
+     and tabs.
+--------------------------------------------------------------------------------
+Answer:
+#!/bin/bash
+total_lines=0; file_count=0
+for file in *.sh; do
+    [ -e "$file" ] || continue
+    lines=$(grep -v -E '^[[:space:]]*#' "$file" | grep -v -E '^[[:space:]]*$' | wc -l)
+    total_lines=$((total_lines + lines)); file_count=$((file_count + 1))
+done
+[ $file_count -gt 0 ] && echo "scale=2; $total_lines / $file_count" | bc || echo "0"
+
+
+Q96. Write a UNIX shell script that calculates the average number of lines of 
+     code in all the files with the .txt extension in the current directory.
+--------------------------------------------------------------------------------
+Answer:
+#!/bin/bash
+total_lines=0; file_count=0
+for file in *.txt; do
+    if [ -f "$file" ]; then
+        lines=$(wc -l < "$file")
+        total_lines=$((total_lines + lines)); file_count=$((file_count + 1))
+    fi
+done
+[ $file_count -gt 0 ] && echo $((total_lines / file_count)) || echo "0"
+
+
+Q97. Write a UNIX Shell script that displays all command line arguments 
+     without using FOR.
+--------------------------------------------------------------------------------
+Answer:
+#!/bin/bash
+echo "$@"
+
+
+Q98. Write a UNIX shell script that sets permissions 600 to all C source files 
+     (extension .c) in the current directory for which the user has writing permissions.
+--------------------------------------------------------------------------------
+Answer:
+#!/bin/bash
+for file in *.c; do
+    [ -w "$file" ] && chmod 600 "$file"
+done
+
+
+Q99. Write a UNIX Shell condition that checks whether a file exists and the 
+     current user has any permissions on it.
+--------------------------------------------------------------------------------
+Answer:
+if [ -e "$file" ] && ( [ -r "$file" ] || [ -w "$file" ] || [ -x "$file" ] ); then
+    echo "File exists and user has permissions."
+fi
+
+
+Q100. Display all the unique file names (without the path) in a given directory 
+      and all its hierarchy of subdirectories.
+--------------------------------------------------------------------------------
+Answer:
+find . -type f -exec basename {} \; | sort -u
